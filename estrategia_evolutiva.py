@@ -222,7 +222,7 @@ class EstrategiaEvolutiva:
             self.pool = newGen
             if i % pos == 0:
                 print('geracao', i)
-            if min(fitnesses) == 0:
+            if min(fitnesses) <= 10e-3:
                 break
         fitnesses = [self.fitness(gen) for gen in self.pool]
         stats["fitness"] = fitnesses

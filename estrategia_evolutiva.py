@@ -1,6 +1,8 @@
 import random
 import math
 import statistics
+from numpy import abs, cos, exp, mean, pi, prod, sin, sqrt, sum
+import numpy as np
 
 
 class EstrategiaEvolutiva:
@@ -17,9 +19,14 @@ class EstrategiaEvolutiva:
 	- uma lista com tuplas: [(X_i, Sigma_i)]
 	"""
 
-    def __init__(self, populationSize: int, mutationMethod: int,
-                 crossoverMethod: int, nextGenMethod: int, limit: int,
-                 learnRate: float):
+    def __init__(self,
+                 populationSize: int,
+                 mutationMethod: int,
+                 crossoverMethod: int,
+                 nextGenMethod: int,
+                 limit: int,
+                 learnRate: float,
+                 pressure: int = 7):
         # -15 < x10 < 15
         # sigma pertence a R
         # x10' = x10 + N(0, sigma)
@@ -31,6 +38,7 @@ class EstrategiaEvolutiva:
         self.iteration = 0
         self.learnRate = learnRate
         self.limit = limit
+        self.pressure = pressure
         if crossoverMethod == 1:
             self.crossOver = self.crossover1
         elif crossoverMethod == 2:
@@ -50,13 +58,15 @@ class EstrategiaEvolutiva:
         else:
             self.nextGen = self.nextGen2
 
+        self.ackleyFunc = self.ackley
+
     def shouldEnd(self, iterations) -> bool:
         """
 		Define se foi alcançada a condição de parada
 		"""
         return iterations == self.limit
 
-    def ackleyFunc(self, xSet):  #xSet: list[float] -> float
+    def ackley2(self, xSet):  #xSet: list[float] -> float
         c1 = 20
         c2 = 0.2
         c3 = 2 * math.pi
@@ -69,11 +79,18 @@ class EstrategiaEvolutiva:
 
         secondSum = 0
         for i in range(0, n):
-            secondSum = secondSum + math.cos(c3 * xSet[i])
+            secondSum += math.cos(c3 * xSet[i])
         secondBlock = -math.exp(secondSum / n)
 
         finalResult = firstBlock + secondBlock + c1 + 1
         return finalResult
+
+    def ackley(self, x, a=20, b=0.2, c=2 * pi):
+        x = np.asarray_chkfinite(x)  # ValueError if any NaN or Inf
+        n = len(x)
+        s1 = sum(x**2)
+        s2 = sum(cos(c * x))
+        return -a * exp(-b * sqrt(s1 / n)) - exp(s2 / n) + a + exp(1)
 
     # def fitness(self, gen: list[tuple[float, float]]) -> float:
     def fitness(self, gen) -> float:
@@ -144,7 +161,7 @@ class EstrategiaEvolutiva:
         """
         Ponto Global Intermediário.
         """
-        mix = lambda p1, p2: (([p1[0] + p2[0]]) / 2, ([p1[1] + p2[1]]) / 2)
+        mix = lambda p1, p2: ((p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2)
         child = []
         for i in range(self.genSize):
             parents = random.sample(pool, 2)
@@ -177,7 +194,7 @@ class EstrategiaEvolutiva:
         crossover (pool) => mutation => filhinho
         """
         newChilds = []
-        for i in range(0, 7 * self.populationSize):
+        for i in range(0, self.pressure * self.populationSize):
             crossChild = self.crossOver(self.pool)
             newChild = self.mutation(gen=crossChild, learnRate=self.learnRate)
             newChilds.append(newChild)
@@ -197,20 +214,22 @@ class EstrategiaEvolutiva:
         torneio sobre μ+λ
         """
 
-        newChildsAndParents = self.pool
-        for i in range(0, 7 * self.populationSize):
+        newChildsAndParents = []
+        for i in range(0, self.pressure * self.populationSize):
             crossChild = self.crossOver(self.pool)
             newChild = self.mutation(gen=crossChild, learnRate=self.learnRate)
             newChildsAndParents.append(newChild)
 
-        newChildsAndParents.sort(key=lambda ind: self.fitness(ind), reverse=False)
+        newChildsAndParents = newChildsAndParents + self.pool
+        newChildsAndParents.sort(
+            key=lambda ind: self.fitness(ind), reverse=False)
         output = newChildsAndParents[:self.populationSize]
 
         return output
 
     # https://repl.it/@minimarvin/oito-rainhas#binary_eight_queens_enhanced_num.py
     def fit(self):
-        stats = {"fitness": [], "fitnessHistory": []}
+        stats = {"fitness": [], "fitnessHistory": [], "bestIndividual": None}
         pos = self.limit // 10
         for i in range(self.limit):
             # print(self.pool)
@@ -221,9 +240,13 @@ class EstrategiaEvolutiva:
             stats["fitnessHistory"].append((avg, stdev))
             self.pool = newGen
             if i % pos == 0:
+                # self.learnRate *= random.uniform(0.5, 1.5)
                 print('geracao', i)
             if min(fitnesses) <= 10e-3:
                 break
+            else:
+                print(min(fitnesses))
         fitnesses = [self.fitness(gen) for gen in self.pool]
         stats["fitness"] = fitnesses
+        stats["bestIndividual"] = self.pool[0]
         return stats
